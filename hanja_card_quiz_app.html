@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>한자 카드 문장 완성 퀴즈</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap');
+    
+    body {
+      font-family: 'Noto Sans KR', sans-serif;
+      background: linear-gradient(135deg, #f0f4f8 0%, #e2e8f0 100%);
+      min-height: 100vh;
+    }
+
+    /* Traditional Hanja Card styling with modern twist */
+    .hanja-card {
+      position: relative;
+      background: #ffffff;
+      border: 2px solid #cbd5e1;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      user-select: none;
+      cursor: pointer;
+    }
+
+    .hanja-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+      border-color: #3b82f6;
+    }
+
+    .hanja-card:active {
+      transform: translateY(-1px);
+    }
+
+    /* Dashed red border inside card like image source */
+    .hanja-card-inner {
+      border: 1.5px dashed #f87171;
+      border-radius: 8px;
+      height: 100%;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 4px;
+    }
+
+    .card-blue .hanja-char {
+      color: #2563eb;
+    }
+
+    .card-drop-placeholder {
+      border: 2px dashed #cbd5e1;
+      border-radius: 12px;
+      background-color: rgba(241, 245, 249, 0.6);
+    }
+
+    /* Shake animation for incorrect answer */
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-8px); }
+      40%, 80% { transform: translateX(8px); }
+    }
+
+    .shake {
+      animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+    }
+
+    /* Bounce animation for correct answer */
+    @keyframes bounce-subtle {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+
+    .bounce-correct {
+      animation: bounce-subtle 0.6s ease-in-out;
+    }
+  </style>
+</head>
+<body class="flex flex-col items-center justify-center p-4 sm:p-6 text-slate-800">
+
+  <!-- Main Container -->
+  <div class="w-full max-w-2xl bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-100 flex flex-col min-h-[640px] justify-between">
+    
+    <!-- Top Header -->
+    <header class="bg-slate-800 text-white px-6 py-4 flex items-center justify-between shadow-md">
+      <div class="flex items-center space-x-3">
+        <span class="bg-indigo-500/20 text-indigo-300 p-2 rounded-lg text-lg">
+          <i class="fa-solid me-1 fa-book-open"></i>
+        </span>
+        <h1 class="font-bold text-lg sm:text-xl tracking-tight">한자 카드 문장 완성</h1>
+      </div>
+      <div class="flex items-center space-x-4">
+        <div class="text-xs sm:text-sm bg-slate-700/70 px-3 py-1.5 rounded-full border border-slate-600">
+          <span class="text-slate-400">문제: </span>
+          <span id="current-stage" class="font-bold text-amber-400">1</span>
+          <span class="text-slate-400">/7</span>
+        </div>
+        <div class="text-xs sm:text-sm bg-indigo-900/50 text-indigo-200 px-3 py-1.5 rounded-full border border-indigo-700/50">
+          <span class="text-indigo-300">점수: </span>
+          <span id="score-text" class="font-bold text-emerald-400">0</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Progress Bar -->
+    <div class="w-full bg-slate-100 h-2">
+      <div id="progress-bar" class="bg-indigo-600 h-2 transition-all duration-300" style="width: 14.28%;"></div>
+    </div>
+
+    <!-- Quiz Screen Content -->
+    <main id="quiz-view" class="p-6 flex-1 flex flex-col justify-between">
+      
+      <!-- Question Section -->
+      <div class="text-center my-2">
+        <span class="inline-block px-3 py-1 bg-amber-100 text-amber-800 text-xs font-semibold rounded-full mb-2">
+          뜻에 맞게 한자 카드를 완성하세요
+        </span>
+        <h2 id="question-text" class="text-2xl sm:text-3xl font-extrabold text-slate-800 tracking-tight transition-all">
+          1. 달이 밝다.
+        </h2>
+      </div>
+
+      <!-- Drop Zone / Target Slot Area -->
+      <div class="my-4">
+        <div class="flex justify-between items-center mb-2 px-1">
+          <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+            <i class="fa-regular fa-hand-pointer mr-1"></i> 완성 구역 (클릭하여 제외)
+          </span>
+          <button id="btn-reset" onclick="resetCurrentSelection()" class="text-xs text-slate-500 hover:text-rose-600 transition flex items-center gap-1 font-medium">
+            <i class="fa-solid fa-rotate-left"></i> 초기화
+          </button>
+        </div>
+        <div id="drop-zone" class="min-h-[110px] sm:min-h-[120px] bg-slate-50 border-2 border-dashed border-slate-300 rounded-2xl p-3 flex flex-wrap gap-2 sm:gap-3 items-center justify-center transition-colors">
+          <!-- Dynamically inserted cards or placeholders -->
+        </div>
+      </div>
+
+      <!-- Feedback Banner Message -->
+      <div id="feedback-msg" class="min-h-[32px] text-center font-bold text-sm sm:text-base transition-all duration-200 flex items-center justify-center">
+        <!-- Text injected dynamically -->
+      </div>
+
+      <!-- Card Pool / Choices Selection Area -->
+      <div class="my-2">
+        <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-2 px-1">
+          <i class="fa-solid fa-layer-group mr-1"></i> 보기 한자 카드 (클릭하여 선택)
+        </span>
+        <div id="card-pool" class="bg-slate-100/80 rounded-2xl p-4 flex flex-wrap gap-2.5 sm:gap-3 items-center justify-center min-h-[130px] border border-slate-200">
+          <!-- Pool cards inserted dynamically -->
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="mt-4 flex gap-3">
+        <button id="btn-check" onclick="checkAnswer()" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 px-6 rounded-xl shadow-lg shadow-indigo-200 transition active:scale-[0.99] flex items-center justify-center gap-2 text-base">
+          <span>정답 확인</span>
+          <i class="fa-solid fa-check"></i>
+        </button>
+        <button id="btn-next" onclick="nextQuestion()" class="hidden flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 px-6 rounded-xl shadow-lg shadow-emerald-200 transition active:scale-[0.99] flex items-center justify-center gap-2 text-base">
+          <span>다음 문제</span>
+          <i class="fa-solid fa-arrow-right"></i>
+        </button>
+      </div>
+
+    </main>
+
+    <!-- Result / Completion Screen (Hidden by default) -->
+    <div id="result-view" class="hidden p-8 flex-1 flex flex-col items-center justify-center text-center">
+      <div class="w-20 h-20 bg-amber-100 rounded-full flex items-center justify-center text-amber-500 text-4xl mb-4 shadow-inner">
+        <i class="fa-solid fa-trophy"></i>
+      </div>
+      <h2 class="text-2xl sm:text-3xl font-extrabold text-slate-800 mb-2">수고하셨습니다!</h2>
+      <p class="text-slate-600 mb-6">모든 한자 카드 문장 완성 문제를 완료했습니다.</p>
+      
+      <div class="bg-slate-50 border border-slate-200 rounded-2xl p-6 w-full max-w-sm mb-8 shadow-sm">
+        <div class="text-sm text-slate-500 mb-1">최종 점수</div>
+        <div class="text-4xl sm:text-5xl font-black text-indigo-600" id="final-score">100</div>
+        <div class="text-xs text-slate-400 mt-2" id="score-summary">7 문제 중 7 문제 정답</div>
+      </div>
+
+      <button onclick="restartQuiz()" class="w-full max-w-sm bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 px-6 rounded-xl shadow-lg shadow-indigo-200 transition active:scale-[0.99] flex items-center justify-center gap-2">
+        <i class="fa-solid fa-rotate-right"></i>
+        <span>다시 도전하기</span>
+      </button>
+    </div>
+
+  </div>
+
+  <script>
+    /*
+      Hanja Dictionary Source (Strictly using only provided characters):
+      高(고), 多(다), 馬(마), 名(명), 明(명), 木(목), 肥(비), 師(사), 
+      石(석), 水(수), 植(식), 兒(아), 我(아), 於(어), 汝(여), 月(월), 
+      爲(위), 人(인), 長(장), 情(정), 天(천), 投(투), 呼(호)
+    */
+    const HANJA_DICT = {
+      '高': { char: '高', reading: '고', colorBlue: false },
+      '多': { char: '多', reading: '다', colorBlue: false },
+      '馬': { char: '馬', reading: '마', colorBlue: false },
+      '名': { char: '名', reading: '명', colorBlue: false },
+      '明': { char: '明', reading: '명', colorBlue: false },
+      '木': { char: '木', reading: '목', colorBlue: false },
+      '肥': { char: '肥', reading: '비', colorBlue: true },  /* Blue in sample image */
+      '師': { char: '師', reading: '사', colorBlue: false },
+      '石': { char: '石', reading: '석', colorBlue: false },
+      '水': { char: '水', reading: '수', colorBlue: false },
+      '植': { char: '植', reading: '식', colorBlue: false },
+      '兒': { char: '兒', reading: '아', colorBlue: false },
+      '我': { char: '我', reading: '아', colorBlue: false },
+      '於': { char: '於', reading: '어', colorBlue: false },
+      '汝': { char: '汝', reading: '여', colorBlue: false },
+      '月': { char: '月', reading: '월', colorBlue: false },
+      '爲': { char: '爲', reading: '위', colorBlue: false },
+      '人': { char: '人', reading: '인', colorBlue: false },
+      '長': { char: '長', reading: '장', colorBlue: false },
+      '情': { char: '情', reading: '정', colorBlue: false },
+      '天': { char: '天', reading: '천', colorBlue: false },
+      '投': { char: '投', reading: '투', colorBlue: true },  /* Blue in sample image */
+      '呼': { char: '呼', reading: '호', colorBlue: false }
+    };
+
+    // 7 Quiz Questions Dataset
+    const QUIZ_DATA = [
+      {
+        id: 1,
+        question: "1. 달이 밝다.",
+        answer: ['月', '明'],
+        pool: ['月', '明', '天', '高']
+      },
+      {
+        id: 2,
+        question: "2. 하늘은 높고 말은 살찐다.",
+        answer: ['天', '高', '馬', '肥'],
+        pool: ['天', '高', '馬', '肥', '長', '木']
+      },
+      {
+        id: 3,
+        question: "3. 나는 나무를 심었다.",
+        answer: ['我', '植', '木'],
+        pool: ['我', '植', '木', '人', '師']
+      },
+      {
+        id: 4,
+        question: "4. 선생님이 이름을 불렀다.",
+        answer: ['師', '呼', '名'],
+        pool: ['師', '呼', '名', '兒', '爲']
+      },
+      {
+        id: 5,
+        question: "5. 아이가 어른이 되었다.",
+        answer: ['兒', '爲', '長'],
+        pool: ['兒', '爲', '長', '人', '汝', '多']
+      },
+      {
+        id: 6,
+        question: "6. 너는 정이 많다.",
+        answer: ['汝', '多', '情'],
+        pool: ['汝', '多', '情', '我', '高']
+      },
+      {
+        id: 7,
+        question: "7. 사람이 물에 돌을 던졌다.",
+        answer: ['人', '投', '石', '於', '水'],
+        pool: ['人', '投', '石', '於', '水', '木', '肥']
+      }
+    ];
+
+    // State Variables
+    let currentQuizIndex = 0;
+    let score = 0;
+    let selectedCards = []; // Cards placed in drop zone: [{ id: uniqueId, char: '月' }, ...]
+    let availablePool = [];  // Cards remaining in selection pool: [{ id: uniqueId, char: '月' }, ...]
+    let correctCount = 0;
+
+    // DOM Elements
+    const questionTextEl = document.getElementById('question-text');
+    const dropZoneEl = document.getElementById('drop-zone');
+    const cardPoolEl = document.getElementById('card-pool');
+    const feedbackMsgEl = document.getElementById('feedback-msg');
+    const currentStageEl = document.getElementById('current-stage');
+    const scoreTextEl = document.getElementById('score-text');
+    const progressBarEl = document.getElementById('progress-bar');
+    const btnCheck = document.getElementById('btn-check');
+    const btnNext = document.getElementById('btn-next');
+    const quizView = document.getElementById('quiz-view');
+    const resultView = document.getElementById('result-view');
+
+    // Initialize & Load Question
+    function loadQuestion() {
+      const currentQuiz = QUIZ_DATA[currentQuizIndex];
+      
+      // Update Headers
+      currentStageEl.textContent = currentQuizIndex + 1;
+      questionTextEl.textContent = currentQuiz.question;
+      progressBarEl.style.width = `${((currentQuizIndex + 1) / QUIZ_DATA.length) * 100}%`;
+      
+      // Reset Feedback and buttons
+      feedbackMsgEl.textContent = '';
+      feedbackMsgEl.className = 'min-h-[32px] text-center font-bold text-sm sm:text-base transition-all duration-200 flex items-center justify-center';
+      btnCheck.classList.remove('hidden');
+      btnNext.classList.add('hidden');
+
+      // Prepare Pool Cards with unique IDs to distinguish duplicates if any
+      selectedCards = [];
+      availablePool = currentQuiz.pool.map((char, index) => ({
+        uid: `card-${currentQuizIndex}-${index}-${char}`,
+        char: char
+      }));
+
+      // Shuffle pool slightly for engaging interaction
+      shuffleArray(availablePool);
+
+      renderBoard();
+    }
+
+    // Utility: Fisher-Yates Shuffle
+    function shuffleArray(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+    }
+
+    // Create Card HTML Element
+    function createCardElement(cardObj, isSelectedArea) {
+      const info = HANJA_DICT[cardObj.char] || { char: cardObj.char, reading: '?', colorBlue: false };
+      
+      const card = document.createElement('div');
+      const textColorClass = info.colorBlue ? 'card-blue' : '';
+      
+      card.className = `hanja-card ${textColorClass} w-14 h-20 sm:w-16 sm:h-24 p-1 flex-shrink-0`;
+      
+      card.innerHTML = `
+        <div class="hanja-card-inner">
+          <span class="hanja-char font-bold text-3xl sm:text-4xl leading-none">${info.char}</span>
+        </div>
+      `;
+
+      card.addEventListener('click', () => {
+        if (isSelectedArea) {
+          unselectCard(cardObj);
+        } else {
+          selectCard(cardObj);
+        }
+      });
+
+      return card;
+    }
+
+    // Render Drop Zone and Pool Area
+    function renderBoard() {
+      const currentQuiz = QUIZ_DATA[currentQuizIndex];
+      dropZoneEl.innerHTML = '';
+      cardPoolEl.innerHTML = '';
+
+      // Render Cards in Drop Zone
+      if (selectedCards.length === 0) {
+        dropZoneEl.innerHTML = `
+          <div class="text-slate-400 text-xs sm:text-sm py-4 flex items-center justify-center gap-1">
+            <i class="fa-regular fa-hand-pointer text-slate-300 text-base"></i>
+            <span>아래 한자 카드를 순서대로 선택하세요.</span>
+          </div>
+        `;
+      } else {
+        selectedCards.forEach(cardObj => {
+          dropZoneEl.appendChild(createCardElement(cardObj, true));
+        });
+      }
+
+      // Fill placeholders if drop zone is shorter than answer length to guide user
+      const targetLength = currentQuiz.answer.length;
+      if (selectedCards.length < targetLength) {
+        const neededPlaceholders = targetLength - selectedCards.length;
+        for (let i = 0; i < neededPlaceholders; i++) {
+          const ph = document.createElement('div');
+          ph.className = 'card-drop-placeholder w-14 h-20 sm:w-16 sm:h-24 flex items-center justify-center text-slate-300 font-bold text-sm';
+          ph.textContent = selectedCards.length + i + 1;
+          dropZoneEl.appendChild(ph);
+        }
+      }
+
+      // Render Cards in Pool Area
+      if (availablePool.length === 0) {
+        cardPoolEl.innerHTML = `
+          <div class="text-slate-400 text-xs sm:text-sm py-4">
+            모든 카드가 선택되었습니다.
+          </div>
+        `;
+      } else {
+        availablePool.forEach(cardObj => {
+          cardPoolEl.appendChild(createCardElement(cardObj, false));
+        });
+      }
+    }
+
+    // Move Card from Pool to Drop Zone
+    function selectCard(cardObj) {
+      if (btnCheck.classList.contains('hidden')) return; // Ignore if already checked
+
+      const index = availablePool.findIndex(c => c.uid === cardObj.uid);
+      if (index !== -1) {
+        availablePool.splice(index, 1);
+        selectedCards.push(cardObj);
+        renderBoard();
+        clearFeedback();
+      }
+    }
+
+    // Move Card from Drop Zone back to Pool
+    function unselectCard(cardObj) {
+      if (btnCheck.classList.contains('hidden')) return; // Ignore if already checked
+
+      const index = selectedCards.findIndex(c => c.uid === cardObj.uid);
+      if (index !== -1) {
+        selectedCards.splice(index, 1);
+        availablePool.push(cardObj);
+        renderBoard();
+        clearFeedback();
+      }
+    }
+
+    // Reset Selected Cards back to Pool
+    function resetCurrentSelection() {
+      if (btnCheck.classList.contains('hidden')) return;
+      if (selectedCards.length === 0) return;
+
+      availablePool = [...availablePool, ...selectedCards];
+      selectedCards = [];
+      renderBoard();
+      clearFeedback();
+    }
+
+    function clearFeedback() {
+      feedbackMsgEl.textContent = '';
+      dropZoneEl.classList.remove('shake');
+    }
+
+    // Check Answer
+    function checkAnswer() {
+      const currentQuiz = QUIZ_DATA[currentQuizIndex];
+      const userPattern = selectedCards.map(c => c.char).join('');
+      const correctPattern = currentQuiz.answer.join('');
+
+      if (selectedCards.length === 0) {
+        feedbackMsgEl.textContent = "한자 카드를 선택하여 문장을 완성해 주세요!";
+        feedbackMsgEl.className = "min-h-[32px] text-center font-bold text-sm sm:text-base text-amber-600 flex items-center justify-center";
+        return;
+      }
+
+      if (userPattern === correctPattern) {
+        // Correct Answer
+        score += 15; // 15 pts per question (approx ~100 max)
+        if (score > 100) score = 100;
+        correctCount++;
+        scoreTextEl.textContent = Math.min(score, 100);
+
+        feedbackMsgEl.innerHTML = `<i class="fa-solid fa-circle-check mr-2"></i> 정답입니다! 아주 잘 하셨습니다.`;
+        feedbackMsgEl.className = "min-h-[32px] text-center font-bold text-base sm:text-lg text-emerald-600 flex items-center justify-center";
+
+        dropZoneEl.classList.add('bounce-correct');
+        setTimeout(() => dropZoneEl.classList.remove('bounce-correct'), 600);
+
+        btnCheck.classList.add('hidden');
+        btnNext.classList.remove('hidden');
+
+      } else {
+        // Wrong Answer
+        feedbackMsgEl.innerHTML = `<i class="fa-solid fa-circle-xmark mr-2"></i> 순서나 한자가 맞지 않습니다. 다시 시도해보세요.`;
+        feedbackMsgEl.className = "min-h-[32px] text-center font-bold text-sm sm:text-base text-rose-600 flex items-center justify-center";
+
+        dropZoneEl.classList.remove('shake');
+        // Trigger reflow to restart animation
+        void dropZoneEl.offsetWidth;
+        dropZoneEl.classList.add('shake');
+      }
+    }
+
+    // Proceed to next question or display result screen
+    function nextQuestion() {
+      currentQuizIndex++;
+      if (currentQuizIndex < QUIZ_DATA.length) {
+        loadQuestion();
+      } else {
+        showFinalResult();
+      }
+    }
+
+    // Display Final Results Screen
+    function showFinalResult() {
+      quizView.classList.add('hidden');
+      resultView.classList.remove('hidden');
+
+      // Standardized final score maxing at 100 for 7 correct
+      const finalScoreCalculated = Math.round((correctCount / QUIZ_DATA.length) * 100);
+      document.getElementById('final-score').textContent = `${finalScoreCalculated}점`;
+      document.getElementById('score-summary').textContent = `${QUIZ_DATA.length} 문제 중 ${correctCount} 문제 정답`;
+      
+      // Full progress bar
+      progressBarEl.style.width = '100%';
+    }
+
+    // Restart Whole Quiz
+    function restartQuiz() {
+      currentQuizIndex = 0;
+      score = 0;
+      correctCount = 0;
+      scoreTextEl.textContent = '0';
+      
+      resultView.classList.add('hidden');
+      quizView.classList.remove('hidden');
+      
+      loadQuestion();
+    }
+
+    // Initial Start
+    window.onload = () => {
+      loadQuestion();
+    };
+  </script>
+</body>
+</html>
